@@ -1,0 +1,6 @@
+{
+  "name": "DevWidgets - Windows Desktop Productivity Widgets",
+  "description": "Desktop productivity widget application inspired by modern rounded widgets for Windows 10/11 featuring real GitHub & LeetCode tracking, heatmaps, and customizable glassmorphism widgets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
