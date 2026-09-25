@@ -4,171 +4,174 @@ A modern, dark-themed Windows 10/11 desktop widget suite inspired by rounded pro
 
 ---
 
-## 🚀 Live App & Public Access
+## Features
 
-- **Public Shared Web App**: [https://ais-pre-7db7hsqu6tqvmbqri2vujb-918377544437.asia-east1.run.app](https://ais-pre-7db7hsqu6tqvmbqri2vujb-918377544437.asia-east1.run.app)
-  *(Anyone can access and use this online without installing any software!)*
-- **GitHub / Open Source Repository**: You can publish this codebase directly to GitHub, GitLab, or distribute it as a pre-built Windows desktop release.
+- **Windows Desktop Widget System**:
+  - Independent, movable, and resizable widgets
+  - Rounded corners (`26px`) with dark charcoal aesthetic (`#18191F` & `#1E2026`)
+  - Acrylic/Mica glassmorphism with real-time backdrop blur and opacity adjustments
+  - Snapping to a 12px desktop grid
+  - "Always on Top" pin mode per widget or globally
+  - State persistence in local storage
+  - Built-in Windows 11 desktop wallpaper previews (Bloom Dark, Bloom Light, Cyberpunk Grid, Mountain Dusk)
+  - Interactive Windows 11 Taskbar with Start menu launcher and live clock
+
+- **GitHub Activity Widget**:
+  - Profile avatar, username, and direct link to profile
+  - Total contributions this year & overall
+  - Current streak and all-time longest streak
+  - This week, this month, and today's commit counters
+  - Interactive square-cell contribution heatmap (3m, 6m, 12m views) with 5 intensity levels
+  - Day inspection popover (e.g., *"12 contributions — September 24"*)
+  - Official GitHub REST & GraphQL API support with optional Personal Access Token (5,000 req/hr)
+
+- **LeetCode Progress Widget**:
+  - Problems solved counter with circular progress indicator (`59 / 4060`)
+  - Easy, Medium, and Hard difficulty breakdowns with visual progress bars
+  - Global ranking and acceptance rate
+  - Dedicated LeetCode square activity heatmap (0 = dark, 1 = light green, 2-3 = medium green, 4+ = bright green)
+  - Today, this week, and this month problem solved counters
+
+- **Daily Coding Progress ("Today's Progress")**:
+  - Dual progress bars for today's LeetCode problems and GitHub commits
+  - Active joint daily coding streak
+
+- **Coding Progress Dashboard (Combined)**:
+  - Side-by-side LeetCode & GitHub progress cards
+  - Stacked dual activity timeline grids
+
+- **Goal & Target Widget**:
+  - Configurable Monthly, Weekly, and Daily targets
+  - In-widget inline numerical target editing
+
+- **Quick Stats Widget**:
+  - Compact summary of streaks, solved problems, and total commits
 
 ---
 
-## 📥 How to Install and Run DevWidgets on Windows
+## 1. How to Install Dependencies
 
-You have **two simple ways** to install and run DevWidgets on your computer:
+Ensure you have [Node.js](https://nodejs.org/) (v18 or newer) and `npm` installed.
 
-### Option 1: Native Windows Desktop App (.exe / .msi) — Recommended
-
-This runs as a borderless, transparent desktop widget application on Windows 10 or 11 with system tray support.
-
-#### Step 1: Prerequisites
-Ensure you have the following installed on your Windows machine:
-1. **Node.js** (v18 or higher): Download from [nodejs.org](https://nodejs.org/).
-2. **Rust & Cargo**: Run `winget install Rustlang.Rustup` in PowerShell or download from [rustup.rs](https://rustup.rs/).
-3. **Microsoft C++ Build Tools**: Download via Visual Studio Installer (check *"Desktop development with C++"*).
-
-#### Step 2: Clone & Install Dependencies
-Open PowerShell or Command Prompt:
 ```bash
-# Clone the repository (or extract downloaded ZIP)
+# Clone the repository
 git clone https://github.com/your-username/devwidgets.git
 cd devwidgets
 
-# Install project dependencies and Tauri CLI
+# Install npm dependencies
 npm install
-npm install -D @tauri-apps/cli
 ```
 
-#### Step 3: Run the Desktop Application
-To launch directly on your desktop in development mode:
+For building native Windows binaries (`.exe`), you will also need:
+- [Rust](https://www.rust-lang.org/tools/install) (via `rustup`)
+- Microsoft C++ Build Tools (via Visual Studio Installer with "Desktop development with C++")
+
+---
+
+## 2. How to Run in Development
+
+To start the Vite development server:
+
 ```bash
-npx tauri dev
+npm run dev
 ```
 
-#### Step 4: Build Windows Installer (.exe / .msi)
-To package a standalone Windows installer that you can keep or share with anyone:
+Open your browser at `http://localhost:3000`.
+
+To run with the native Tauri Windows desktop window:
+
 ```bash
-npx tauri build
+npm run tauri dev
 ```
-Once the build completes, your ready-to-use installer will be located at:
-```text
+
+---
+
+## 3. How to Configure GitHub
+
+1. Click the **Settings** icon (gear) in the top-right toolbar or right-click any widget and choose **Settings**.
+2. Navigate to the **GitHub** tab.
+3. Enter your **GitHub Username** (e.g., `torvalds` or your handle).
+4. *(Optional)* Provide a **GitHub Personal Access Token (PAT)**:
+   - Go to [GitHub Settings -> Developer Settings -> Personal Access Tokens -> Fine-grained tokens](https://github.com/settings/tokens).
+   - Generate a token with public read permissions.
+   - Pasting this token raises the GitHub rate limit from 60 requests/hour to 5,000 requests/hour.
+5. Click **Save GitHub Settings**. Your contribution graph and streaks will immediately sync.
+
+---
+
+## 4. How to Configure LeetCode
+
+1. In the **Settings** modal, switch to the **LeetCode** tab.
+2. Enter your public **LeetCode Username** (e.g., `neal_wu` or your username).
+3. Click **Save LeetCode Settings**.
+4. DevWidgets will query the public profile data and populate problem counts, rankings, acceptance rate, and calendar activity.
+> **Note**: DevWidgets never requests or stores your LeetCode password.
+
+---
+
+## 5. How the APIs Work
+
+- **GitHub Service (`src/services/github/`)**:
+  - `fetchGitHubUserProfile`: Queries `https://api.github.com/users/{username}` for profile data.
+  - `fetchGitHubContributions`: Queries public contribution mirrors (`github-contributions-api.jogruber.de` & `gh-calendar.rs`) to retrieve daily submission counts and intensity levels. If a PAT is supplied, it executes a GraphQL query against `https://api.github.com/graphql`.
+  - Computes streaks, week, month, and day totals in `src/utils/streak.ts`.
+  - Caches results in `localStorage` for 30 minutes to eliminate redundant API requests.
+
+- **LeetCode Service (`src/services/leetcode/`)**:
+  - Queries public statistics endpoints (`leetcode-stats-api.herokuapp.com` and `alfa-leetcode-api.onrender.com`).
+  - Decodes the `submissionCalendar` timestamps (epoch seconds) into daily problem counts.
+  - Maps counts into 4 intensity tiers:
+    - `0`: No submissions
+    - `1`: 1 problem solved
+    - `2`: 2–3 problems solved
+    - `3`: 4+ problems solved
+  - Caches results locally for 30 minutes with instant manual refresh support.
+
+---
+
+## 6. How to Build the Windows `.exe`
+
+DevWidgets uses Tauri to generate a lightweight, secure Windows executable.
+
+```bash
+# Compile web assets and build Windows installer (.msi / .exe)
+npm run tauri build
+```
+
+The output installer will be located in:
+```
 src-tauri/target/release/bundle/nsis/DevWidgets_1.0.0_x64-setup.exe
 src-tauri/target/release/bundle/msi/DevWidgets_1.0.0_x64_en-US.msi
 ```
-Double-click `DevWidgets_1.0.0_x64-setup.exe` to install it just like any standard Windows desktop software.
 
 ---
 
-### Option 2: Browser & Progressive Web App (PWA) Mode
+## 7. How to Configure Windows Startup
 
-If you don't want to install Rust or C++ tools, you can run or install DevWidgets via any modern browser (Chrome, Edge, Brave):
+### In-App Setting:
+1. Open **Settings -> General**.
+2. Toggle the **Start with Windows** switch to **ON**.
 
-1. **Direct Web Access**:
-   Open [https://ais-pre-7db7hsqu6tqvmbqri2vujb-918377544437.asia-east1.run.app](https://ais-pre-7db7hsqu6tqvmbqri2vujb-918377544437.asia-east1.run.app).
-2. **Install as Windows App**:
-   In Microsoft Edge or Google Chrome:
-   - Click the **Install** button in the browser address bar (or menu `...` -> **Apps** -> **Install this site as an app**).
-   - Check **"Open as window"** and click **Install**.
-   - Pin it to your Windows Taskbar or Desktop. It will launch in its own standalone window without browser tabs or address bar.
-3. **Or run locally with Node.js**:
-   ```bash
-   git clone https://github.com/your-username/devwidgets.git
-   cd devwidgets
-   npm install
-   npm run dev
-   ```
-   Open `http://localhost:3000`.
+### Windows 10/11 Settings:
+1. Open Windows **Settings** (`Win + I`).
+2. Go to **Apps -> Startup**.
+3. Locate **DevWidgets** and toggle it **On**.
 
 ---
 
-## 🌐 Making This Project Public (Sharing with Others)
+## 8. Where Local Settings Are Stored
 
-### 1. Share the Live Hosted URL
-The easiest way to make this app public immediately is by sharing the deployed URL:
-👉 **[https://ais-pre-7db7hsqu6tqvmbqri2vujb-918377544437.asia-east1.run.app](https://ais-pre-7db7hsqu6tqvmbqri2vujb-918377544437.asia-east1.run.app)**
-Anyone with this link can view the widgets, test with their own GitHub & LeetCode usernames, and customize themes.
+- **Browser Dev Mode**:
+  Stored in browser `localStorage` under:
+  - `devwidgets_settings_v1`: Theme, accent color, usernames, goals, opacity, blur, grid snapping.
+  - `devwidgets_widgets_v1`: Coordinates (`x`, `y`), dimensions (`width`, `height`), visibility, and z-index ordering for each widget.
+  - `devwidgets_gh_cache_{username}`: Cached GitHub profile & contribution calendar.
+  - `devwidgets_lc_cache_{username}`: Cached LeetCode statistics & submission history.
 
-### 2. Publish to GitHub
-To share the open-source repository publicly:
-```bash
-git init
-git add .
-git commit -m "feat: initial DevWidgets Windows desktop application"
-git branch -M main
-git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/devwidgets.git
-git push -u origin main
-```
-In your GitHub repository settings, make sure the repository visibility is set to **Public**.
-
-### 3. Distribute Pre-built Windows Releases on GitHub
-1. In your GitHub repository, click on **Releases** -> **Draft a new release**.
-2. Tag your release as `v1.0.0`.
-3. Drag and drop the generated `DevWidgets_1.0.0_x64-setup.exe` and `DevWidgets_1.0.0_x64_en-US.msi` into the release binaries section.
-4. Anyone visiting your repository can download and run the `.exe` directly without needing Node.js or Rust installed.
-
----
-
-## ⚙️ How to Configure GitHub & LeetCode
-
-### GitHub Configuration
-1. Click the **Settings** icon (gear in the top-right or on the Windows taskbar).
-2. Open the **GitHub** tab.
-3. Enter your **GitHub Username** (e.g. `torvalds` or your handle).
-4. *(Optional)* Add a **GitHub Personal Access Token (PAT)**:
-   - Go to [GitHub Settings -> Personal Access Tokens](https://github.com/settings/tokens).
-   - Create a read-only token.
-   - Adding a token raises the GitHub rate limit from 60 requests/hr to 5,000 requests/hr.
-5. Click **Save GitHub Settings**. Your contribution graph, daily commits, and streaks will load immediately.
-
-### LeetCode Configuration
-1. Open the **LeetCode** tab in Settings.
-2. Enter your public **LeetCode Username** (e.g. `neal_wu` or your username).
-3. Click **Save LeetCode Settings**.
-4. The widget will query public stats and display solved problems, difficulty bars (Easy/Medium/Hard), ranking, and submission calendar heatmap.
-> **Note**: DevWidgets never asks for or stores passwords. Only public handles are used.
-
----
-
-## 🖥️ Desktop Features & Controls
-
-| Feature | How to Use |
-|---|---|
-| **Move Widgets** | Click and drag the widget header bar |
-| **Resize Widgets** | Drag the resize handle at the bottom-right corner of any widget |
-| **Snap to Grid** | Click the grid icon in the top toolbar to toggle 12px grid snapping |
-| **Pin Always on Top** | Click the pin icon in the widget header or right-click -> *"Keep on top"* |
-| **Inspect Day** | Click any square in the contribution heatmaps to see exact count & date |
-| **Reset Layout** | Click the rotate arrow in the top toolbar to restore default layout |
-| **Change Wallpaper** | Click the image icon in the top bar to toggle between Bloom Dark, Cyberpunk, Dusk, and Bloom Light |
-| **System Tray** | Click the `^` tray icon on the taskbar to access quick controls |
-| **Context Menu** | Right-click any widget or the desktop background for contextual actions |
-
----
-
-## 🛠️ How the APIs Work
-
-- **GitHub Service (`src/services/github/`)**:
-  - `fetchGitHubUserProfile`: Queries `https://api.github.com/users/{username}` for profile info.
-  - `fetchGitHubContributions`: Queries public mirrors (`github-contributions-api.jogruber.de` & `gh-calendar.rs`) and falls back to GraphQL if a PAT is present.
-  - Streaks, week, and month totals are calculated in `src/utils/streak.ts`.
-  - Responses are cached in `localStorage` for 30 minutes to stay within rate limits.
-
-- **LeetCode Service (`src/services/leetcode/`)**:
-  - Queries public statistics APIs (`leetcode-stats-api.herokuapp.com` and `alfa-leetcode-api.onrender.com`).
-  - Decodes epoch timestamp calendar entries into daily problem counts.
-  - Maps counts into 4 intensity levels: `0` (none), `1` (1 solved), `2` (2-3 solved), `3` (4+ solved).
-  - Caches results for 30 minutes with instant manual refresh support.
-
----
-
-## 📁 Where Local Settings Are Stored
-
-- **Browser / PWA**: Stored in `localStorage`:
-  - `devwidgets_settings_v1`: Theme, accent color, opacity, blur, usernames, and goals.
-  - `devwidgets_widgets_v1`: Widget coordinates, dimensions, visibility, and z-index ordering.
-  - `devwidgets_gh_cache_*`: Cached GitHub data.
-  - `devwidgets_lc_cache_*`: Cached LeetCode data.
 - **Windows Native (Tauri)**:
-  `%APPDATA%\com.devwidgets.desktop\store.json` (typically `C:\Users\<User>\AppData\Roaming\com.devwidgets.desktop\`).
+  Stored in the Windows user application directory:
+  `%APPDATA%\com.devwidgets.desktop\store.json`
+  (Typically `C:\Users\<YourUser>\AppData\Roaming\com.devwidgets.desktop\`).
 
 ---
 
