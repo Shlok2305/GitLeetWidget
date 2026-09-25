@@ -3,7 +3,7 @@ import { calculateStreaks } from '../../utils/streak';
 import { fetchLeetCodeStatsFromApi } from './leetcodeApi';
 
 const LEETCODE_CACHE_PREFIX = 'devwidgets_lc_cache_';
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 export async function getLeetCodeStats(username: string, forceRefresh = false): Promise<LeetCodeStats> {
   const cleanUsername = username.trim();
@@ -20,7 +20,14 @@ export async function getLeetCodeStats(username: string, forceRefresh = false): 
       if (cachedRaw) {
         const cached = JSON.parse(cachedRaw);
         const age = Date.now() - new Date(cached.lastUpdated).getTime();
-        if (age < CACHE_TTL_MS && cached.activityDays && cached.activityDays.length > 0) {
+        // Verify cache has calendar/activityDays with actual counts
+        if (
+          age < CACHE_TTL_MS &&
+          cached.activityDays &&
+          cached.activityDays.length > 0 &&
+          cached.calendarData &&
+          Object.keys(cached.calendarData).length > 0
+        ) {
           return {
             ...cached,
             isLoading: false,
@@ -48,28 +55,36 @@ export async function getLeetCodeStats(username: string, forceRefresh = false): 
       calendarMap = raw.submissionCalendar;
     }
 
-    // Convert timestamp entries (seconds) to YYYY-MM-DD
+    // Convert epoch seconds to local YYYY-MM-DD
     const dateCounts: Record<string, number> = {};
     Object.entries(calendarMap).forEach(([tsSec, count]) => {
       const timestampMs = parseInt(tsSec, 10) * 1000;
       if (!isNaN(timestampMs)) {
         const d = new Date(timestampMs);
-        const dateStr = d.toISOString().split('T')[0];
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         dateCounts[dateStr] = (dateCounts[dateStr] || 0) + Number(count);
       }
     });
 
-    // Generate past 365 days
+    // Generate past 365 days up to today
     const activityDays: LeetCodeDayActivity[] = [];
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayYear = now.getFullYear();
+    const todayMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const todayDate = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${todayYear}-${todayMonth}-${todayDate}`;
 
+    // Start of current week (Monday)
     const startOfWeek = new Date(now);
-    const day = startOfWeek.getDay();
-    const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+    const dayOfWeek = startOfWeek.getDay();
+    const diff = startOfWeek.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
     startOfWeek.setDate(diff);
     startOfWeek.setHours(0, 0, 0, 0);
 
+    // Start of current month
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     let solvedToday = 0;
@@ -79,13 +94,16 @@ export async function getLeetCodeStats(username: string, forceRefresh = false): 
     for (let i = 365; i >= 0; i--) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const count = dateCounts[dateStr] || 0;
 
-      // LeetCode levels: 0 = none, 1 = 1 solved, 2 = 2-3 solved, 3 = 4+ solved
+      // LeetCode levels: 0 = none, 1 = 1-2 solved, 2 = 3-5 solved, 3 = 6+ solved
       let level: 0 | 1 | 2 | 3 = 0;
-      if (count >= 4) level = 3;
-      else if (count >= 2) level = 2;
+      if (count >= 6) level = 3;
+      else if (count >= 3) level = 2;
       else if (count >= 1) level = 1;
 
       activityDays.push({
@@ -97,7 +115,7 @@ export async function getLeetCodeStats(username: string, forceRefresh = false): 
       if (dateStr === todayStr) {
         solvedToday = count;
       }
-      const itemDate = new Date(dateStr + 'T00:00:00');
+      const itemDate = new Date(`${dateStr}T00:00:00`);
       if (itemDate >= startOfWeek && itemDate <= now) {
         solvedThisWeek += count;
       }
@@ -108,45 +126,37 @@ export async function getLeetCodeStats(username: string, forceRefresh = false): 
 
     const { currentStreak } = calculateStreaks(activityDays);
 
-    const recentSubmissions: LeetCodeSubmissionItem[] = [
-      {
-        id: '1',
-        title: 'Two Sum',
-        titleSlug: 'two-sum',
-        timestamp: new Date().toISOString(),
-        statusDisplay: 'Accepted',
-        lang: 'TypeScript',
-      },
-      {
-        id: '2',
-        title: 'Merge Intervals',
-        titleSlug: 'merge-intervals',
-        timestamp: new Date(Date.now() - 3600000 * 5).toISOString(),
-        statusDisplay: 'Accepted',
-        lang: 'Python3',
-      },
-      {
-        id: '3',
-        title: 'Longest Palindromic Substring',
-        titleSlug: 'longest-palindromic-substring',
-        timestamp: new Date(Date.now() - 3600000 * 26).toISOString(),
-        statusDisplay: 'Accepted',
-        lang: 'Rust',
-      },
-    ];
+    // Map recent submissions if returned by API
+    const recentSubmissions: LeetCodeSubmissionItem[] = (raw.recentSubmissions || []).map(
+      (sub, index) => {
+        let tsIso = new Date().toISOString();
+        const tsNum = Number(sub.timestamp);
+        if (!isNaN(tsNum)) {
+          tsIso = new Date(tsNum * 1000).toISOString();
+        }
+        return {
+          id: String(index + 1),
+          title: sub.title,
+          titleSlug: sub.titleSlug,
+          timestamp: tsIso,
+          statusDisplay: sub.statusDisplay,
+          lang: sub.lang,
+        };
+      }
+    );
 
     const result: LeetCodeStats = {
       username: cleanUsername,
-      avatarUrl: `https://raw.githubusercontent.com/feathericons/feather/master/icons/code.svg`,
+      avatarUrl: raw.avatar || `https://assets.leetcode.com/users/default_avatar.jpg`,
       profileUrl: `https://leetcode.com/u/${cleanUsername}`,
       totalSolved: raw.totalSolved || 0,
-      totalQuestions: raw.totalQuestions || 3450,
+      totalQuestions: raw.totalQuestions || 4060,
       easySolved: raw.easySolved || 0,
-      totalEasy: raw.totalEasy || 850,
+      totalEasy: raw.totalEasy || 966,
       mediumSolved: raw.mediumSolved || 0,
-      totalMedium: raw.totalMedium || 1780,
+      totalMedium: raw.totalMedium || 2117,
       hardSolved: raw.hardSolved || 0,
-      totalHard: raw.totalHard || 820,
+      totalHard: raw.totalHard || 977,
       acceptanceRate: Math.round((raw.acceptanceRate || 0) * 10) / 10,
       ranking: raw.ranking || null,
       contributionPoints: raw.contributionPoints,
@@ -179,7 +189,7 @@ export async function getLeetCodeStats(username: string, forceRefresh = false): 
         return {
           ...cached,
           isLoading: false,
-          error: `Offline/Error: ${err.message || 'Unable to refresh'}. Showing cached data.`,
+          error: `Offline/Notice: ${err.message || 'Unable to refresh'}. Showing cached data.`,
         };
       }
     } catch {}
